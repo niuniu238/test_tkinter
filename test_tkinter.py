@@ -107,7 +107,7 @@ class MainApplication(tk.Frame):
         # TODO: Load data3 and display on canvas3
         pass
     def read_tif(self):
-        path = '/media/xbb/xbbRed/Hunan_electric/data/tif/liquid_water_2022-12-25.tif'
+        path = 'data/tif/liquid_water_2022-12-25.tif'
         # ./../data/tif/liquid_water_2022-12-25.tif
         data = rxr.open_rasterio(path)
 
