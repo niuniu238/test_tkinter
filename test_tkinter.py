@@ -2,11 +2,12 @@ import numpy as np
 import tkinter as tk
 # import tkinter.filedialog
 # import rasterio
-import rioxarray as rxr
+# import rioxarray as rxr
+import xarray as xr
 from tkcalendar import DateEntry
 from dateutil import parser
 import cartopy.crs as ccrs
-import cartopy.io.shapereader as Reader
+from cartopy.io.shapereader import Reader
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 
@@ -90,26 +91,80 @@ class MainApplication(tk.Frame):
         
     def load_data(self):
         
-        data = self.read_tif()
-        fig = plt.figure(figsize=(6,6),dpi=100)
-        plt.title(self.param_var.get()+self.date_entry.get())
+        data = self.read_nc()
+        HunanProvince_shp_path = 'shp/Hunan_province..shp'
+        Hunan_shp_path = '/home/xbb/Code/python/Hunan_E/shp/Hunan_city.shp'
+        EW_shp_path = '/home/xbb/Code/python/Hunan_E/shp/electric_wire.shp'
 
-        ax = plt.axes(projection=ccrs.PlateCarree())
-        img = ax.pcolormesh(data.x,data.y,data[0],transform=ccrs.PlateCarree()) 
-        canvas1 = FigureCanvasTkAgg(fig,master=self.frame2)
-        canvas_widget = canvas1.get_tk_widget()
-        canvas_widget.grid(row=0, column=0)
-        canvas1.draw()
-        #  TODO: Load image data and display on canvas1
-        pass
-        # TODO: Load data2 and display on canvas2
-        pass
-        # TODO: Load data3 and display on canvas3
-        pass
-    def read_tif(self):
-        path = 'data/tif/liquid_water_2022-12-25.tif'
-        # ./../data/tif/liquid_water_2022-12-25.tif
-        data = rxr.open_rasterio(path)
+        Hunan_c = Reader(Hunan_shp_path)
+        Hunan_p = Reader(HunanProvince_shp_path)
+        electric_wire = Reader(EW_shp_path)
+
+        self.fig1 = plt.figure(figsize=(6,6),dpi=100)
+        self.ax1 = plt.axes(projection=ccrs.PlateCarree())
+        self.ax1.set_title(self.param_var.get()+self.date_entry.get())
+
+        self.ax1.add_geometries(electric_wire.geometries(),crs=ccrs.PlateCarree(),
+                          facecolor='none',linestyle='-.',edgecolor='red',linewidth=1,zorder=2)
+        self.ax1.add_geometries(Hunan_c.geometries(),crs=ccrs.PlateCarree(),
+                          facecolor='none',edgecolor='black',linewidth=0.3,zorder=2)
+        self.ax1.add_geometries(Hunan_p.geometries(),crs=ccrs.PlateCarree(),
+                          facecolor='none',edgecolor='black',alpha=0.5,linewidth=1.5,zorder=2)
+
+        img = self.ax1.pcolormesh(data.longitude,data.latitude,data[-1],transform=ccrs.PlateCarree()) 
+        self.ax1.set_xlim(data.longitude.min(),data.longitude.max())
+        self.ax1.set_ylim(data.latitude.min(),data.latitude.max())
+        
+        self.canvas1 = FigureCanvasTkAgg(self.fig1,master=self.frame2)
+        self.canvas_widget1 = self.canvas1.get_tk_widget()
+        self.canvas_widget1.grid(row=0, column=0)
+        self.canvas1.draw()
+
+        self.fig1.canvas.mpl_connect('button_press_event', self.on_press)
+
+    def on_press(self,event):
+        # print("my position:" ,event.button,event.xdata, event.ydata)
+        
+        self.fig2 = plt.figure(figsize=(6,2),dpi=100)
+        self.ax2 = self.fig2.add_subplot(111)
+        self.ax2.scatter(event.xdata, event.ydata)
+        self.ax2.set_ylabel('khkhkk')
+        self.ax2.set_xlabel('xxxxxx')
+        self.ax2.set_xlim(108.5,114.5)
+        self.ax2.set_ylim(24.4,30.3)
+        plt.tight_layout()
+        self.canvas2 = FigureCanvasTkAgg(self.fig2,master=self.frame2)
+        self.canvas_widget2 = self.canvas2.get_tk_widget()
+        self.canvas_widget2.grid(row=1, column=0)
+        self.canvas2.draw()
+
+        self.fig3 = plt.figure(figsize=(4,6),dpi=100)
+        self.ax3 = self.fig3.add_subplot(111)
+        self.ax3.scatter(event.xdata, event.ydata)
+        self.ax3.set_ylabel('khkhkk')
+        self.ax3.set_xlabel('xxxxxx')
+        self.ax3.set_xlim(108.5,114.5)
+        self.ax3.set_ylim(24.4,30.3)
+        plt.tight_layout()
+        self.canvas3 = FigureCanvasTkAgg(self.fig3,master=self.frame2)
+        self.canvas_widget3 = self.canvas3.get_tk_widget()
+        self.canvas_widget3.grid(row=0, column=1)
+        self.canvas3.draw()
+    # def fig
+    def read_nc(self):
+        # path = '/media/xbb/xbbRed/Hunan_electric/data/tif/liquid_water_2022-12-25.tif'
+        # data = rxr.open_rasterio(path)
+        dict_paramter = {"temperature":"t", "relative_humidity":"r", "wind":{'u':'u','v':'v'}, "liquid_water":"tclw"}
+        paramter = self.param_var.get()
+        date_entry = self.date_entry.get()
+        path = f'data/interp_nc/interp_{paramter}.nc'
+        ds = xr.open_dataset(path)
+        date_entry_ = date_entry.replace('/','-')
+
+        str = f'{date_entry_}T05:00:00.000000000'
+        dsi = ds.sel(time=np.datetime64(str))
+
+        data = dsi[dict_paramter[paramter]]
 
         return data
 
