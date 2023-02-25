@@ -92,6 +92,7 @@ class MainApplication(tk.Frame):
     def load_data(self):
         
         data = self.read_nc()
+
         HunanProvince_shp_path = 'shp/Hunan_province..shp'
         Hunan_shp_path = '/home/xbb/Code/python/Hunan_E/shp/Hunan_city.shp'
         EW_shp_path = '/home/xbb/Code/python/Hunan_E/shp/electric_wire.shp'
@@ -124,7 +125,9 @@ class MainApplication(tk.Frame):
 
     def on_press(self,event):
         # print("my position:" ,event.button,event.xdata, event.ydata)
-        
+        row,col = self.func_geo_to_imagexy(self.geotransform,event.xdata,event.ydata)
+        print(row,col)
+        data = self.read_nc()
         self.fig2 = plt.figure(figsize=(6,2),dpi=100)
         self.ax2 = self.fig2.add_subplot(111)
         self.ax2.scatter(event.xdata, event.ydata)
@@ -140,11 +143,15 @@ class MainApplication(tk.Frame):
 
         self.fig3 = plt.figure(figsize=(4,6),dpi=100)
         self.ax3 = self.fig3.add_subplot(111)
-        self.ax3.scatter(event.xdata, event.ydata)
+        # self.ax3.scatter(event.xdata, event.ydata)
+        self.ax3.plot(data[:,row,col]-273.15,1000-data.level,'-o')
+
+        self.ax3.set_yticks(np.arange(0, 801, 100))
+        self.ax3.set_yticklabels([str(i) for i in np.arange(1000, 199, -100)])
         self.ax3.set_ylabel('khkhkk')
         self.ax3.set_xlabel('xxxxxx')
-        self.ax3.set_xlim(108.5,114.5)
-        self.ax3.set_ylim(24.4,30.3)
+        # self.ax3.set_xlim(108.5,114.5)
+        # self.ax3.set_ylim(24.4,30.3)
         plt.tight_layout()
         self.canvas3 = FigureCanvasTkAgg(self.fig3,master=self.frame2)
         self.canvas_widget3 = self.canvas3.get_tk_widget()
@@ -158,16 +165,43 @@ class MainApplication(tk.Frame):
         paramter = self.param_var.get()
         date_entry = self.date_entry.get()
         path = f'data/interp_nc/interp_{paramter}.nc'
-        ds = xr.open_dataset(path)
+        self.ds = xr.open_dataset(path)
         date_entry_ = date_entry.replace('/','-')
 
         str = f'{date_entry_}T05:00:00.000000000'
-        dsi = ds.sel(time=np.datetime64(str))
+        dsi = self.ds.sel(time=np.datetime64(str))
 
         data = dsi[dict_paramter[paramter]]
-
+        self.func_get_transform()
         return data
+    
+    def func_get_transform(self):
+        lon = self.ds.longitude
+        lat = self.ds.latitude
+        lon_min, _, _, lat_max = lon.min(), lon.max(), lat.min(), lat.max()
+        res = (lon[1] - lon[0], lat[1] - lat[0])
+        # 创建GeoTransform对象,注意这个数据的lat是##从小到大##排序的
+        self.geotransform = (lon_min, res[0], 0, lat_max, 0, res[1])
+    def func_geo_to_imagexy(self,trans,lon,lat):
+        '''
+        根据GDAL六参数模型将地理坐标转换为图上坐标
+        return:返回图上行列号(row,col)
+        '''
+        x,y=lon,lat
+        a = np.array([[trans[1],trans[2]],[trans[4],trans[5]]])
+        b = np.array([x-trans[0],y-trans[3]])
+        col,row = np.linalg.solve(a,b).astype(int)
+        return row,col
+    def func_imagexy_to_geo(self,trans,row,col):
+        '''
+        根据图上行列号转换GDAL六参数
+        return:lon,lat
+        '''
+        lon = trans[0]+col*trans[1]+row*trans[2]
+        lat = trans[3]+col*trans[4]+row*trans[5]
+        return lon,lat
 
+    
 root = tk.Tk()
 root.title('hello')
 app = MainApplication(master=root)
